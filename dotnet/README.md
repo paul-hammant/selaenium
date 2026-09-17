@@ -51,7 +51,8 @@ load: `SELENIUM_CORE_LIB` → `native/<lib>` → `runtimes/<rid>/native/<lib>`.
 Build + pack, then push to your internal feed:
 
 ```sh
-aeb dotnet/.tests.ae            # builds + tests the assembly with the engine
+aeb dotnet/SeleniumCore.Tests/.tests.ae # builds + tests the assembly with the engine
+aeb dotnet/.example.ae                   # builds package + proves clean dotnet run consumer
 dotnet pack dotnet/SeleniumCore/SeleniumCore.csproj -c Release
 dotnet nuget push bin/Release/Selenium.WebDriver.*.nupkg \
     --source https://nuget.your-shop.internal
@@ -69,5 +70,6 @@ SeleniumCore/                 the OpenQA.Selenium surface (WebDriver / By / …)
   NativeLoader.cs             resolves the engine (env → native/ → runtimes/<rid>/native)
   SeleniumCore.csproj         packs the assembly + the runtime-native engine asset
 SeleniumCore.Tests/           the binding test suite
-.tests.ae                     aeb node → builds + tests with the engine
+.example.ae                   aeb node → builds .nupkg + proves clean dotnet run consumer
+example/                      NuGet consumer app (Program.cs + Consumer.csproj)
 ```

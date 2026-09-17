@@ -1,0 +1,24 @@
+// .NET consumer-install proof: prove the packaged Selenium.WebDriver NuGet
+// package (.nupkg) restores + runs a consumer app from a CLEAN environment for a
+// third party. dotnet.consumer_example stages the consumer project (Consumer.csproj +
+// Program.cs), configures a local nuget.config feed pointing to the produced
+// .nupkg, and executes `dotnet run` across ffi, discovery, and live modes with
+// SELENIUM_CORE_LIB unset (only the package's bundled .so can satisfy the load).
+import bldr
+import dotnet
+import dotnet (stage, run_in, run_arg)
+
+aeb(cap) {
+    bldr.build() {
+        prereq("dotnet:8")
+        dep("dotnet/SeleniumCore/.package.ae")
+        dotnet.consumer_example() {
+            stage("example/Consumer.csproj", "dotnet-consumer/Consumer.csproj")
+            stage("example/Program.cs", "dotnet-consumer/Program.cs")
+            run_in("dotnet-consumer")
+            run_arg("ffi")
+            run_arg("discovery")
+            run_arg("live")
+        }
+    }
+}
