@@ -13,8 +13,8 @@ and then runs a consumer program against it in three modes: `ffi` (marshalling
 works), `discovery` (the bundled `.so` is found with zero configuration), and
 `live` (it drives real headless Chrome).
 
-Eleven bindings have one: python, ruby, javascript, java, go, rust, dart, nim,
-zig, lua, d. **swift does not — and should.**
+Twelve bindings have one: python, ruby, javascript, java, go, rust, dart, nim,
+zig, lua, d, dotnet. **swift does not — and should.**
 
 ## Why this layer is not optional
 

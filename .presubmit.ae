@@ -90,5 +90,6 @@ aeb(cap) {
         dep("zig/.example.ae")
         dep("lua/.example.ae")
         dep("d/.example.ae")
+        dep("dotnet/.example.ae")
     }
 }

@@ -75,8 +75,17 @@ namespace SeleniumCore.Tests
                 var chromeOpts = new Dictionary<string, object?> { ["args"] = chromeArgs };
                 string? chromeBin = Environment.GetEnvironmentVariable("SEL_CHROME_BINARY");
                 if (!string.IsNullOrEmpty(chromeBin)) chromeOpts["binary"] = chromeBin;
-                var d = RemoteWebDriver.Chrome($"http://127.0.0.1:{cdPort}",
-                    new Dictionary<string, object?> { ["goog:chromeOptions"] = chromeOpts });
+                RemoteWebDriver d;
+                try
+                {
+                    d = RemoteWebDriver.Chrome($"http://127.0.0.1:{cdPort}",
+                        new Dictionary<string, object?> { ["goog:chromeOptions"] = chromeOpts });
+                }
+                catch (WebDriverException ex) when (ex.Message.Contains("only supports Chrome version"))
+                {
+                    Skip.If(true, ex.Message);
+                    return;
+                }
                 try
                 {
                     d.SessionId.Length.ShouldBeGreaterThan(0);
@@ -248,8 +257,17 @@ namespace SeleniumCore.Tests
                 var chromeOpts = new Dictionary<string, object?> { ["args"] = chromeArgs };
                 string? chromeBin = Environment.GetEnvironmentVariable("SEL_CHROME_BINARY");
                 if (!string.IsNullOrEmpty(chromeBin)) chromeOpts["binary"] = chromeBin;
-                var d = RemoteWebDriver.Chrome($"http://127.0.0.1:{cdPort}",
-                    new Dictionary<string, object?> { ["goog:chromeOptions"] = chromeOpts });
+                RemoteWebDriver d;
+                try
+                {
+                    d = RemoteWebDriver.Chrome($"http://127.0.0.1:{cdPort}",
+                        new Dictionary<string, object?> { ["goog:chromeOptions"] = chromeOpts });
+                }
+                catch (WebDriverException ex) when (ex.Message.Contains("only supports Chrome version"))
+                {
+                    Skip.If(true, ex.Message);
+                    return;
+                }
                 try
                 {
                     d.BidiAvailable.ShouldBeTrue();
@@ -331,8 +349,17 @@ namespace SeleniumCore.Tests
                 var chromeOpts = new Dictionary<string, object?> { ["args"] = chromeArgs };
                 string? chromeBin = Environment.GetEnvironmentVariable("SEL_CHROME_BINARY");
                 if (!string.IsNullOrEmpty(chromeBin)) chromeOpts["binary"] = chromeBin;
-                var d = RemoteWebDriver.Chrome($"http://127.0.0.1:{cdPort}",
-                    new Dictionary<string, object?> { ["goog:chromeOptions"] = chromeOpts });
+                RemoteWebDriver d;
+                try
+                {
+                    d = RemoteWebDriver.Chrome($"http://127.0.0.1:{cdPort}",
+                        new Dictionary<string, object?> { ["goog:chromeOptions"] = chromeOpts });
+                }
+                catch (WebDriverException ex) when (ex.Message.Contains("only supports Chrome version"))
+                {
+                    Skip.If(true, ex.Message);
+                    return;
+                }
                 try
                 {
                     d.Get("data:text/html,<!doctype html><title>Atoms</title>"
@@ -390,8 +417,17 @@ namespace SeleniumCore.Tests
                 var chromeOpts = new Dictionary<string, object?> { ["args"] = chromeArgs };
                 string? chromeBin = Environment.GetEnvironmentVariable("SEL_CHROME_BINARY");
                 if (!string.IsNullOrEmpty(chromeBin)) chromeOpts["binary"] = chromeBin;
-                var d = RemoteWebDriver.Chrome($"http://127.0.0.1:{cdPort}",
-                    new Dictionary<string, object?> { ["goog:chromeOptions"] = chromeOpts });
+                RemoteWebDriver d;
+                try
+                {
+                    d = RemoteWebDriver.Chrome($"http://127.0.0.1:{cdPort}",
+                        new Dictionary<string, object?> { ["goog:chromeOptions"] = chromeOpts });
+                }
+                catch (WebDriverException ex) when (ex.Message.Contains("only supports Chrome version"))
+                {
+                    Skip.If(true, ex.Message);
+                    return;
+                }
                 try
                 {
                     d.Get(url);
@@ -457,6 +493,13 @@ namespace SeleniumCore.Tests
 
         private static string? Which(string cmd)
         {
+            if (cmd == "chromedriver")
+            {
+                string? envDriver = Environment.GetEnvironmentVariable("SEL_CHROMEDRIVER_BINARY");
+                if (!string.IsNullOrEmpty(envDriver) && File.Exists(envDriver)) return envDriver;
+                string? resolved = RemoteWebDriver.ResolveDriver("chrome");
+                if (!string.IsNullOrEmpty(resolved) && File.Exists(resolved)) return resolved;
+            }
             foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(':'))
             {
                 var p = Path.Combine(dir, cmd);

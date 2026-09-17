@@ -6,12 +6,17 @@
 // next to a consumer's app.
 import bldr
 import dotnet
+import copy
 
 aeb(cap) {
     bldr.build() {
         prereq("dotnet:8")
         dep("selenium_core/.build.ae")
         native_lib = dep_artifact("selenium_core/.build.ae", "shared_lib")
+        copy.file() {
+            from("../../target/build/selenium_core/lib/libselenium_core.so")
+            to("native/libselenium_core.so")
+        }
         dotnet.build_project_existing() {
             csproj_path("SeleniumCore.csproj")
             native_runtime("linux-x64", native_lib)

@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Net.Sockets;
-using SeleniumCore;
+using System.Text;
+using OpenQA.Selenium;
 
-// Third-party consumer example. References the INSTALLED SeleniumCore NuGet
+// Third-party consumer example. References the INSTALLED Selenium.WebDriver NuGet
 // package (restored from a local feed — NOT the source tree) and proves the
 // bundled engine .so (shipped under runtimes/linux-x64/native/) loads and drives
 // the protocol, with SELENIUM_CORE_LIB unset so only the package's own bundled
@@ -42,15 +44,15 @@ internal static class Program
 
     private static void ModeFfi()
     {
-        if (WebDriver.Route("get") != "POST /session/:sessionId/url") Fail("route mismatch");
-        if (WebDriver.ErrorCode("no such element") != 17) Fail("errorCode mismatch");
-        if (!WebDriver.Locator(By.Id, "main").Contains("*[id=")) Fail("locator mismatch");
+        if (RemoteWebDriver.Route("get") != "POST /session/:sessionId/url") Fail("route mismatch");
+        if (RemoteWebDriver.ErrorCode("no such element") != 17) Fail("errorCode mismatch");
+        if (!RemoteWebDriver.Locator("id", "main").Contains("*[id=")) Fail("locator mismatch");
         bool threw = false;
         try
         {
-            WebDriver.Chrome("http://127.0.0.1:1");
+            RemoteWebDriver.Chrome("http://127.0.0.1:1");
         }
-        catch (WebDriverError e)
+        catch (WebDriverException e)
         {
             threw = e.Code == -1;
         }
@@ -63,7 +65,7 @@ internal static class Program
         string? env = Environment.GetEnvironmentVariable("SELENIUM_CORE_LIB");
         if (!string.IsNullOrEmpty(env)) Fail("SELENIUM_CORE_LIB set; discovery must run without it");
         // Forcing a native call proves the bundled .so (runtimes/.../native) loaded.
-        if (WebDriver.Route("newSession") != "POST /session") Fail("route mismatch (bundled .so did not load)");
+        if (RemoteWebDriver.Route("newSession") != "POST /session") Fail("route mismatch (bundled .so did not load)");
         Console.WriteLine("consumer(discovery): OK — zero-config bundled-.so discovery works");
     }
 
@@ -75,31 +77,30 @@ internal static class Program
             Console.WriteLine("consumer(live): SKIPPED — chromedriver not on PATH");
             return;
         }
-        int port;
-        var l = new TcpListener(System.Net.IPAddress.Loopback, 0);
-        l.Start();
-        port = ((System.Net.IPEndPoint)l.LocalEndpoint).Port;
-        l.Stop();
-        var cd = Process.Start(new ProcessStartInfo(driver, $"--port={port}")
+        int webPort = FreePort();
+        using var webCts = new System.Threading.CancellationTokenSource();
+        StartHelloWebSite(webPort, webCts.Token);
+
+        int cdPort = FreePort();
+        var cd = Process.Start(new ProcessStartInfo(driver, $"--port={cdPort}")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         })!;
         try
         {
-            if (!WaitUp(port, 10000))
+            if (!WaitUp(cdPort, 10000))
             {
                 Console.WriteLine("consumer(live): SKIPPED — chromedriver did not come up");
                 return;
             }
-            var d = WebDriver.HeadlessChrome($"http://127.0.0.1:{port}");
+            var d = RemoteWebDriver.HeadlessChrome($"http://127.0.0.1:{cdPort}");
             try
             {
-                string html = "<!doctype html><title>Installed</title><h1 id=\"h\">Hi</h1>";
-                d.Get("data:text/html;charset=utf-8," + Uri.EscapeDataString(html));
-                if (d.Title != "Installed") Fail("title=" + d.Title);
-                if (d.FindElement(By.Id, "h").Text != "Hi") Fail("text mismatch");
-                Console.WriteLine("consumer(live): OK — installed package drove real headless Chrome");
+                d.Get($"http://127.0.0.1:{webPort}/");
+                if (d.Title != "Hello World") Fail("title=" + d.Title);
+                if (d.FindElement(By.Id("greeting")).Text != "Hello, World!") Fail("greeting mismatch");
+                Console.WriteLine("consumer(live): OK — installed package drove real headless Chrome testing Hello World site");
             }
             finally
             {
@@ -109,11 +110,44 @@ internal static class Program
         finally
         {
             try { cd.Kill(); } catch { /* gone */ }
+            webCts.Cancel();
         }
+    }
+
+    private static void StartHelloWebSite(int port, System.Threading.CancellationToken ct)
+    {
+        const string html = "<!doctype html><title>Hello World</title><h1 id=\"greeting\">Hello, World!</h1>";
+        var listener = new HttpListener();
+        listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        listener.Start();
+        var t = new System.Threading.Thread(() =>
+        {
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    var ctx = listener.GetContext();
+                    byte[] buf = Encoding.UTF8.GetBytes(html);
+                    ctx.Response.ContentType = "text/html; charset=utf-8";
+                    ctx.Response.OutputStream.Write(buf, 0, buf.Length);
+                    ctx.Response.Close();
+                }
+            }
+            catch { }
+            finally { try { listener.Stop(); } catch { } }
+        }) { IsBackground = true };
+        t.Start();
     }
 
     private static string? Which(string cmd)
     {
+        if (cmd == "chromedriver")
+        {
+            string? envDriver = Environment.GetEnvironmentVariable("SEL_CHROMEDRIVER_BINARY");
+            if (!string.IsNullOrEmpty(envDriver) && File.Exists(envDriver)) return envDriver;
+            string? resolved = RemoteWebDriver.ResolveDriver("chrome");
+            if (!string.IsNullOrEmpty(resolved) && File.Exists(resolved)) return resolved;
+        }
         string? path = Environment.GetEnvironmentVariable("PATH");
         if (path == null) return null;
         foreach (string dir in path.Split(':'))
@@ -124,6 +158,15 @@ internal static class Program
         return null;
     }
 
+    private static int FreePort()
+    {
+        var l = new TcpListener(IPAddress.Loopback, 0);
+        l.Start();
+        int port = ((IPEndPoint)l.LocalEndpoint).Port;
+        l.Stop();
+        return port;
+    }
+
     private static bool WaitUp(int port, int timeoutMs)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
@@ -132,7 +175,7 @@ internal static class Program
             try
             {
                 using var c = new TcpClient();
-                c.Connect(System.Net.IPAddress.Loopback, port);
+                c.Connect(IPAddress.Loopback, port);
                 return true;
             }
             catch
